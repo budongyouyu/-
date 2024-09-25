@@ -1,0 +1,152 @@
+\chapter{Photoslip Algorithm：传统算法}
+
+本篇文章来自\url{https://zhuanlan.zhihu.com/p/660866515?utm_campaign=shareopn&utm_medium=social&utm_psn=1815096437689683968&utm_source=wechat_session}
+
+\vspace*{2em}
+
+序列图像的光流信息是指一幅图像中的许多点在第二幅图像中移动的位置，通常假设第一幅图像中的大部分点框架都可以在第二幅图像中找到。
+
+在理想情况下，光流场与图像中的二维运动场吻合，光流法利用图像序列中像素在时间域上的变化以及相邻帧之间的相关性来找到上一帧跟当前帧之间存在的对应关系，一幅图像中每个像素的位移矢量，指示该像素在另一幅图像中的相对位置，从而计算出相邻帧之间物体的运动信息，因此可用于对物体运动的情况进行估测与分析。
+
+如果图像中的每个像素都采用这种方法通常称为“\textbf{稠密光流}”。还有一种算法称为“\textbf{稀疏光流}”，仅仅只跟踪图像中某些点的子集，该算法通常是快速且可靠的，因为其将注意力只放在容易跟踪的特定点上，稀疏跟踪的计算成本远远低于稠密跟踪
+
+\section{\textsl{Lucas-Kanade} Algorithm}
+
+\textsl{Lucas-Kanade}基于两个重要假设：
+
+\subsection*{\textsl{亮度不变假设}}
+
+亮度不变假设是指待估计的光流的两帧图像的同一物体的亮度不变。
+
+\begin{equation}
+    I(x,y,t)=I(x+u, y+v,t+\Delta t)
+\end{equation}
+
+将右边的等式作一阶泰勒展开得
+\begin{equation}
+    I(x+u,y+v,t+\Delta t)=I(x,y,t)+I_x' u+I_y'v+I_t' \Delta t
+\end{equation}
+
+根据假设
+\begin{equation}
+    \begin{aligned}
+        & I_x' u+I_y'v+I_t' \Delta t = 0 
+    \end{aligned}
+\end{equation}
+\begin{equation}
+    [I_x',I_y']\left[\begin{array}{c}
+        u\\
+        v
+    \end{array}\right]=-I_t'\Delta t
+\end{equation}
+
+$I_x',I_y'$分别为$(x,y)$像素点处图像亮度在$x$方向和$y$方向的梯度，即图像$x$和$y$。$I_t'\Delta t$即为两图之间的$(x,y)$坐标位置之间的亮度差。表示为$\Delta I_t=I_t'\Delta_t$，即
+\begin{equation}
+    [I_x',I_y']\left[\begin{array}{c}
+        u\\
+        v
+    \end{array}\right]=-\Delta I_t
+\end{equation}
+
+给定两张图像，$I_x',I_y',\Delta I_t$均为已知量，$u,v$即待求的光流。
+
+\subsection*{\textsl{邻域光流相似假设}}
+
+算法认为在每一个滑动窗口内每一个点的移动速度$u,v$一致。假设在一个大小为$m\times m$的窗口内，图像的光流是一个恒定值，那么就可以得到以下条件方程
+\begin{equation}
+    \begin{aligned}
+        & I_{x1}u+I_{y1}v=-I_{t1} \\
+        & I_{x2}u+I_{y2}v=-I_{t2} \\
+        & \vdots \\
+        & I_{xn}u+I_{yn}v=-I_{tn} \\
+    \end{aligned}
+\end{equation}
+
+用矩阵形式表示为
+\begin{equation}
+    \left[
+        \begin{array}{cc}
+            I_{x1} & I_{y1} \\
+            I_{x2} & I_{y2} \\
+            \vdots & \vdots \\
+            I_{xn} & I_{yn}
+        \end{array}
+    \right]
+    \left[
+        \begin{array}{c}
+            u \\
+            v \\
+        \end{array}
+    \right]=
+    \left[
+        \begin{array}{c}
+            -I_{t1} \\
+            -I_{t2} \\
+            \vdots \\
+            -I_{tn} \\
+        \end{array}
+    \right]
+\end{equation}
+
+记作$Ax=-b$，可求得光流$x=(u,v)$，根据最小二乘法
+\begin{equation}
+    A^TAx=A^T(-b)
+\end{equation}
+
+则最终所有求解的光流速度矢量为
+\begin{equation}
+    x=(A^{T} A)^{-1}A^T(-b)
+\end{equation}
+
+其中，要求$(A^TA)$可逆，如果$(A^TA)$不可逆，方程可能出现多解，即\textbf{孔径问题}(从圆孔中观察三种移动的条纹的变化，是一致的，从而无法通过圆控得到条纹的真实移动方向，即光流方向)。
+
+
+
+\subsection*{缺点}
+
+这个算法不足在于它不能产生一个密度很高的流向量，例如在运动的边缘和黑大的同质区域中的微小移动方面流信息会很快褪去，它的优点在于有噪声存在的鲁棒性还是可以的。
+
+\subsection*{改进算法}
+
+\textsl{Lucas-Kanade}的改进算法为\textsl{LK金字塔算法}。\textsl{LK金字塔算法}算法的约束条件为：\textsl{微小运动，亮度不变以及区域一致性}。
+
+\section{\textsl{Dis-FLow} Algorithm}
+
+\textsl{Dis Flow}是在\textsl{LK金字塔算法}的基础上，提出了一个\textbf{逆向搜索}，从而节省计算，提高性能。
+
+\section{\textsl{Horn-Schunck} Algorithm}
+
+\textsl{HS}算法用一种全局方法估计图像的稠密光流场。\textsl{HS}光流计算基于两个假说
+
+\subsection*{\textsl{亮度不变假设}}
+
+运动物体的灰度在很短的时间间隔内保持不变；
+
+\subsection*{\textsl{光流场平滑假设}}
+
+场景中属于同一个物体的像素形成光流场应当十分平滑，只有在物体边界的地方才会出现光流的突变，但这只占图像的一小部分，总体来看图像的光流场应当是平滑的。
+
+\subsection*{\textsl{缺点}}
+
+鲁棒性较差，无法准确处理原本图像梯度较大的边界区域；并没有解决针对变换幅度比较大情况如何准确求解光流的问题。
+
+\section{\textsl{Brox-FLow} Algorithm}
+
+\textsl{Brox-FLow}在\textsl{HS}的算法基础上提出了一个新的变分方法。基于三个假设
+
+\subsection*{\textsl{灰度值恒定假设}}
+
+\subsection*{\textsl{梯度恒定假设}}
+
+\subsection*{\textsl{光流场平滑假设}}
+
+\section{总结}
+
+传统光流算法主要分为\textsl{稀疏光流}和\textsl{稠密光流}。
+\begin{enumerate}
+    \item 稀疏光流仅仅只跟踪图像中某些点的子集，计算方便，但对于特征点的选取和精确匹配困难；
+    \item 稠密光流对区域内的所有像素点进行跟踪，计算量大；
+\end{enumerate}
+
+传统光流算法通过若干假设对光流估计进行建模，其中亮度不变假设为光流算法中的基础假设，通过假设对模型进行约束，利用变分法求取最优值，从而得到光流信息。
+但传统光流算法对于最优值的求解，大多需要多次迭代，计算量很大。

@@ -1,0 +1,108 @@
+\chapter{Photoslip Algorithm： 基于深度学习}
+
+本篇文章来自\url{https://zhuanlan.zhihu.com/p/660866515?utm_campaign=shareopn&utm_medium=social&utm_psn=1815096437689683968&utm_source=wechat_session}
+
+\section{Flow Net}
+
+采用端对端的学习方法来预测光流：给定一个由图像对和光流的\textsl{ground truth}组成的数据集，训练一个卷积神经网络直接从图像对中预测光流信息。
+
+假设输入端为两幅序列图像$I_1,I_2$，输出端为预测的光流$F$
+\begin{equation}
+    F=CNN(\theta, I_1, I_2)
+\end{equation}
+
+$\theta$为待学习参数。
+
+\subsection*{\textsl{网络结构}}
+
+在\textsl{FlowNet}中，使用的网络为\textsl{Unet}，分为\textsl{Decoder}和\textsl{Encoder}。
+
+根据输入方式的不同，\textsl{FlowNet}提出了两种网络结构
+
+\begin{enumerate}[itemindent=2em]
+    \item \textsl{FLowNetSimple}
+    
+    直接将两张图像按通道重叠后输入，\textsl{channel}为$6$。
+
+    \item \textsl{FlowNetCorr}
+    
+\end{enumerate}
+
+\subsection*{\textsl{解码器}}
+
+\subsection*{\textsl{总结}}
+
+首个将CNN网络用于光流估计，精度和效果比不上传统基于能量最小化的方法。
+
+\section{PWC Net}
+
+\subsection*{\textsl{原理}}
+
+采用特征金字塔结构作为特征提取网络，其包含三个部分
+\begin{enumerate}[itemindent=2em]
+    \item \textsl{pyramid};
+    \item \textsl{wrap};
+    \item \textsl{cost};
+    \item \textsl{volume};
+\end{enumerate}
+
+\subsection*{\textsl{网络结构}}
+
+\begin{enumerate}[itemindent=2em]
+    \item \textsl{pyramid feature extractor};
+    \item \textsl{wraping layer};
+    \item \textsl{cost volume layer};
+    \item \textsl{optical flow estimator};
+    \item \textsl{context networks}
+\end{enumerate}
+
+\subsection*{\textsl{损失函数}}
+
+训练使用$L_2$损失
+\begin{equation}
+    \mathcal{L}(\Theta)=\sum^{L}_{l=l_0}\alpha_l\sum_{\mathbf{x}}\left| \mathbf{w}^l_\Theta(\mathbf{x})-\mathbf{w}^l_{GT}(\mathbf{x}) \right|_2+\gamma|\Theta|_2
+\end{equation}
+
+其中，$\Theta$为不同金字塔层的特征提取参数和光流估计参数，$\mathbf{w}^l_\Theta(\mathbf{x})$表示网络预测的第$l$金字塔层的光流，$\mathbf{w}^l_{GT}(\mathbf{x})$表示标签值。
+
+\subsection*{\textsl{总结}}
+
+结合了\textsl{coarse-to-fine}与传统方法中的多种思想，效果优于传统方法，但是模型参数多，计算量大。
+
+\section{IRR}
+
+\subsection*{\textsl{原理}}
+
+受传统方法能量最小化的启发，基于共享权重，对光流进行迭代化细化，利用\textbf{双向估计}和\textbf{遮挡推理}提高光流精度。
+
+\subsection*{\textsl{网络结构}}
+
+\begin{enumerate}[itemindent=2em]
+    \item \textsl{FlowNetS}：在不增加参数或使训练过程复杂化的情况下，通过迭代地重复使用单个网络来不断优化先前的光流估计
+    \begin{equation}
+        \mathbf{f}^i_{fw}=D(E(\mathbf{I}_1),\omega(E(\mathbf{I}_2),\mathbf{f}^{i-1}_{fw}))+\mathbf{f}^{i-1}_{fw}
+    \end{equation}
+
+    \item \textsl{Based PWC-Net}：用一个共享解码器来替代多个解码器，该解码器迭代地改进所有金字塔级别的输出；
+    \item \textsl{遮挡估计}：在\textsl{encoder}末端的第一帧增加了一个额外的\textsl{decoder}$\mathbf{o}^{i}_1$估计遮挡，与光流decoder平行，$\mathbf{o}^{i}_1$的输入与光流的\textsl{decoder}相同，输出通道的数量为$1$；
+    \item \textsl{双向估计}：
+    \item \textsl{对光流和遮挡的双边优化}：
+    \item \textsl{occlusion上采样层}
+\end{enumerate}
+
+\subsection*{\textsl{损失函数}}
+
+分别对光流和遮挡定义$L_2$损失和交叉熵损失
+
+\subsection*{\textsl{总结}}
+
+双向估计对于光流精度的提升不高，但利用正向和反向的一致性能够估计更加准确的遮挡；
+
+\section{RAFT}
+
+为了优化光流估计，RAFT提取像素特征，对所有像素建立多尺度correlation volume，在correlation volume上进行邻域采样得到lookups特征（增强特征相关性，也可以理解为感受野），之后直接使用以CNN-GRU为基础的迭代优化网络，在完整尺寸上对光流估计迭代优化。
+
+\section{GMA}
+
+遮挡问题是指像素点在第一帧中存在，但在第二帧（匹配帧）中不存在的问题。以往的算法使用cost volume去计算两帧之间的相关性，但这种相关性对于被遮挡区域来说是毫无意义的。当两帧像素之间不存在匹配信息时（第二帧像素在第一帧中不存在），单个物体的运动通常时均匀的，运动信息必须从其他像素开始传播。也就是说，未被遮挡的像素点的运动信息可以传播到被遮挡的像素点。但利用传统卷积进行局部传播的缺点在于其范围有限，因此提出global motion aggregation GMA模块（全局聚合模块），以Raft为基础，利用图像自相似解决遮挡问题，该模块基于transformer，可以更好的去学习两帧像素之间的依赖关系（哪个像素与它有关或它属于哪个物体）。
+
